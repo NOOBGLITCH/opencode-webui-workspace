@@ -107,7 +107,12 @@ RUN set -eu; \
 # OpenCode via the v2 installer. INSTALL_DIR is hardcoded to $HOME/.opencode/bin,
 # so promote the binaries to /usr/local/bin (the opencode2 shim is relocatable:
 # it execs `$(dirname $0)/opencode`, so it survives the move).
-RUN curl -fsSL https://opencode.ai/v2/install | bash -s -- --no-modify-path && \
+# Download-to-file (never pipe a flaky network stream straight into bash)
+# with retries: opencode.ai intermittently 503s builder egress.
+RUN set -eu; \
+    curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 -o /tmp/opencode-install.sh https://opencode.ai/v2/install && \
+    bash /tmp/opencode-install.sh --no-modify-path && \
+    rm /tmp/opencode-install.sh && \
     install -m 0755 /root/.opencode/bin/opencode /usr/local/bin/opencode && \
     install -m 0755 /root/.opencode/bin/opencode2 /usr/local/bin/opencode2 && \
     rm -rf /root/.opencode
