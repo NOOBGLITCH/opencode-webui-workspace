@@ -107,15 +107,34 @@ RUN set -eu; \
 # OpenCode via the v2 installer. INSTALL_DIR is hardcoded to $HOME/.opencode/bin,
 # so promote the binaries to /usr/local/bin (the opencode2 shim is relocatable:
 # it execs `$(dirname $0)/opencode`, so it survives the move).
-# Download-to-file (never pipe a flaky network stream straight into bash)
-# with retries: opencode.ai intermittently 503s builder egress.
+# OpenCode CLI, straight from the npm registry. The official installer resolves
+# its version through opencode.ai, which persistently 503s builder egress --
+# the registry holds the same packages with none of the flakiness.
+# (Baseline target mirrors upstream: pre-AVX2 x86_64 only; ARM needs none.)
 RUN set -eu; \
-    curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 -o /tmp/opencode-install.sh https://opencode.ai/v2/install && \
-    bash /tmp/opencode-install.sh --no-modify-path && \
-    rm /tmp/opencode-install.sh && \
-    install -m 0755 /root/.opencode/bin/opencode /usr/local/bin/opencode && \
-    install -m 0755 /root/.opencode/bin/opencode2 /usr/local/bin/opencode2 && \
-    rm -rf /root/.opencode
+    case "$(uname -m)" in \
+      x86_64)  OCARCH=x64 ;; \
+      aarch64) OCARCH=arm64 ;; \
+      *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;; \
+    esac; \
+    OCTARGET="linux-${OCARCH}"; \
+    if [ "$OCARCH" = "x64" ]; then grep -qwi avx2 /proc/cpuinfo 2>/dev/null || OCTARGET="${OCTARGET}-baseline"; fi; \
+    OC_VER=""; OCSCOPE=""; \
+    for s in opencode opencode-ai; do \
+      OC_META="$(curl -fsSL "https://registry.npmjs.org/@${s}%2fcli-${OCTARGET}/latest" || true)"; \
+      OC_VER="$(echo "$OC_META" | jq -r '.version // empty' 2>/dev/null || true)"; \
+      OC_URL="$(echo "$OC_META" | jq -r '.dist.tarball // empty' 2>/dev/null || true)"; \
+      if [ -n "$OC_VER" ] && [ -n "$OC_URL" ]; then OCSCOPE="$s"; break; fi; \
+      OC_VER=""; OC_URL=""; \
+    done; \
+    [ -n "${OC_VER:-}" ] || { echo "could not resolve opencode version for ${OCTARGET}" >&2; exit 1; }; \
+    echo "Installing opencode ${OC_VER} (${OCTARGET}, @${OCSCOPE})"; \
+    curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 -o /tmp/opencode.tgz "$OC_URL"; \
+    rm -rf /tmp/oc-extract && mkdir -p /tmp/oc-extract && tar -xzf /tmp/opencode.tgz -C /tmp/oc-extract; \
+    install -m 0755 /tmp/oc-extract/package/bin/opencode /usr/local/bin/opencode; \
+    printf '#!/bin/sh\nexec "$(dirname "$0")/opencode" "$@"\n' > /usr/local/bin/opencode2; \
+    chmod 0755 /usr/local/bin/opencode2; \
+    rm -rf /tmp/opencode.tgz /tmp/oc-extract
 
 # Config copied late so edits don't invalidate the heavy toolchain layers above.
 # --chown sets ownership with no extra layer and no full-tree chown walk.
