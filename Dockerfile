@@ -41,21 +41,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ./workspace over /home/opencode/workspace, which would shadow any file baked in there.
 RUN useradd -m -s /bin/bash opencode && \
     mkdir -p /home/opencode/workspace /home/opencode/.config/opencode && \
+    chown opencode:opencode /home/opencode/workspace /home/opencode/.config/opencode && \
     echo "opencode ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/opencode && \
     chmod 0440 /etc/sudoers.d/opencode
-COPY opencode.json /home/opencode/.config/opencode/opencode.json
-RUN chown -R opencode:opencode /home/opencode
 
 # Node.js LTS + Wrangler (global npm installs land in /usr/local -> all users).
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
-    npm install -g wrangler && \
+    npm install -g --no-audit --no-fund wrangler && \
     npm cache clean --force && \
     rm -rf /var/lib/apt/lists/* /root/.npm
 
-# Bun, system-wide via BUN_INSTALL (installer default ~/.bun would strand it in /root).
-RUN curl -fsSL https://bun.sh/install | bash && \
-    ln -s /opt/bun/bin/bun /usr/local/bin/bun
+# Bun, system-wide via BUN_INSTALL (installer default ~/.bun would strand it in
+# /root). /opt/bun/bin is already on PATH via ENV, so no symlink needed.
+RUN curl -fsSL https://bun.sh/install | bash
 
 # uv + uvx, system-wide via UV_INSTALL_DIR.
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
@@ -79,22 +78,21 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --pr
     chmod -R a+rX /usr/local/cargo /usr/local/rustup
 
 # glab (GitLab CLI) + gh (GitHub CLI), always latest release, multi-arch.
-# glab asset URLs come from the release API itself, so a rename upstream can't
-# silently 404 the build the way a hardcoded URL pattern would.
+# The glab tag comes from the API redirect URL, not the response body:
+# release notes have intermittently shipped bytes that break JSON parsers,
+# and the tag is all we need -- the asset URL pattern below is verified
+# against direct_asset_url, and curl -f fails the build loudly if it drifts.
 RUN set -eu; \
     case "$(uname -m)" in \
       x86_64)  BINARCH=amd64 ;; \
       aarch64) BINARCH=arm64 ;; \
       *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;; \
     esac; \
-    # Note: release notes sometimes contain raw control characters that break
-    # jq, so strip them before parsing (tag/asset URLs are plain ASCII).
-    GLAB_JSON="$(curl -fsSL 'https://gitlab.com/api/v4/projects/34675721/releases/permalink/latest' | tr -d '\000-\037')"; \
-    GLAB_TAG="$(echo "$GLAB_JSON" | jq -r '.tag_name')"; \
-    GLAB_URL="$(echo "$GLAB_JSON" | jq -r --arg a "linux_${BINARCH}.tar.gz" '[.assets.links[] | select(.name | endswith($a)) | .direct_asset_url // .url][0]')"; \
-    if [ -z "$GLAB_URL" ] || [ "$GLAB_URL" = "null" ]; then echo "no glab tarball found for linux_${BINARCH} in ${GLAB_TAG}" >&2; exit 1; fi; \
+    GLAB_TAG="$(curl -fsSL -o /dev/null -w '%{url_effective}' 'https://gitlab.com/api/v4/projects/34675721/releases/permalink/latest' | grep -o '[^/]*$')"; \
+    case "$GLAB_TAG" in v*) ;; *) echo "bad glab tag from redirect: ${GLAB_TAG}" >&2; exit 1 ;; esac; \
+    GLAB_VER="${GLAB_TAG#v}"; \
     echo "Installing glab ${GLAB_TAG}"; \
-    curl -fsSL -o /tmp/glab.tgz "$GLAB_URL"; \
+    curl -fsSL -o /tmp/glab.tgz "https://gitlab.com/gitlab-org/cli/-/releases/${GLAB_TAG}/downloads/glab_${GLAB_VER}_linux_${BINARCH}.tar.gz"; \
     rm -rf /tmp/glab-extract && mkdir -p /tmp/glab-extract && tar -xzf /tmp/glab.tgz -C /tmp/glab-extract; \
     install -m 0755 "$(find /tmp/glab-extract -name glab -type f | head -n 1)" /usr/local/bin/glab; \
     rm -rf /tmp/glab.tgz /tmp/glab-extract; \
@@ -114,7 +112,9 @@ RUN curl -fsSL https://opencode.ai/v2/install | bash -s -- --no-modify-path && \
     install -m 0755 /root/.opencode/bin/opencode2 /usr/local/bin/opencode2 && \
     rm -rf /root/.opencode
 
-RUN chown -R opencode:opencode /home/opencode
+# Config copied late so edits don't invalidate the heavy toolchain layers above.
+# --chown sets ownership with no extra layer and no full-tree chown walk.
+COPY --chown=opencode:opencode opencode.json /home/opencode/.config/opencode/opencode.json
 
 USER opencode
 WORKDIR /home/opencode/workspace
