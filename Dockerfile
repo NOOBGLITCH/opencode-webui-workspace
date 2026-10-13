@@ -87,7 +87,9 @@ RUN set -eu; \
       aarch64) BINARCH=arm64 ;; \
       *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;; \
     esac; \
-    GLAB_JSON="$(curl -fsSL 'https://gitlab.com/api/v4/projects/34675721/releases/permalink/latest')"; \
+    # Note: release notes sometimes contain raw control characters that break
+    # jq, so strip them before parsing (tag/asset URLs are plain ASCII).
+    GLAB_JSON="$(curl -fsSL 'https://gitlab.com/api/v4/projects/34675721/releases/permalink/latest' | tr -d '\000-\037')"; \
     GLAB_TAG="$(echo "$GLAB_JSON" | jq -r '.tag_name')"; \
     GLAB_URL="$(echo "$GLAB_JSON" | jq -r --arg a "linux_${BINARCH}.tar.gz" '[.assets.links[] | select(.name | endswith($a)) | .direct_asset_url // .url][0]')"; \
     if [ -z "$GLAB_URL" ] || [ "$GLAB_URL" = "null" ]; then echo "no glab tarball found for linux_${BINARCH} in ${GLAB_TAG}" >&2; exit 1; fi; \
