@@ -161,4 +161,4 @@ RUN set -eu; \
     echo "=== rclone ===" && rclone version | head -n 1
 
 ENTRYPOINT ["opencode"]
-CMD ["web", "--port", "4096", "--hostname", "0.0.0.0"]
+CMD ["serve", "--port", "4096", "--hostname", "0.0.0.0"]
