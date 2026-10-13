@@ -41,7 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ./workspace over /home/opencode/workspace, which would shadow any file baked in there.
 RUN useradd -m -s /bin/bash opencode && \
     mkdir -p /home/opencode/workspace /home/opencode/.config/opencode && \
-    chown opencode:opencode /home/opencode/workspace /home/opencode/.config/opencode && \
+    chown opencode:opencode /home/opencode/workspace /home/opencode/.config /home/opencode/.config/opencode && \
     echo "opencode ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/opencode && \
     chmod 0440 /etc/sudoers.d/opencode
 
