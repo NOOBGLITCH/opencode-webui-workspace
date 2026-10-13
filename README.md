@@ -1,6 +1,6 @@
 # OpenCode WebUI Workspace
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/O5nDar?referralCode=Z1xivh&utm_medium=integration&utm_source=template&utm_campaign=generic)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/opencode-webui-wor-1?referralCode=Z1xivh&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 A containerized development environment running OpenCode WebUI with comprehensive tooling support. This Docker image includes Python, Node.js, Bun, Go, Rust, and essential development tools, all running under a non-root `opencode` user with sudo privileges.
 
