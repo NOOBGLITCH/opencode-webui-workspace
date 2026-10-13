@@ -155,19 +155,12 @@ The container provides a clean workspace at `/home/opencode/workspace/`. You can
 
 ## Publishing Images
 
-The repository includes a GitHub Actions workflow (`.github/workflows/publish.yml`) that automatically:
-- Publishes to GitHub Container Registry (GHCR)
-- Supports multiple platforms (linux/amd64, linux/arm64)
-- Tags images with git refs and semver tags
+Build and push manually when you need to share the image (multi-arch):
 
-### Automatic Publishing
-
-Images are automatically published on:
-- Push to `main` branch (tagged as `latest`)
-- Push of version tags (v1.0.0, v2.0.0, etc.)
-- Manual workflow dispatch from Actions tab
-
-No additional secrets needed - uses `GITHUB_TOKEN` automatically!
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ghcr.io/<owner>/<repo>:latest --push .
+```
 
 ## Requirements
 
