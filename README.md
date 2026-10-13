@@ -1,18 +1,19 @@
 # OpenCode WebUI Workspace
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/opencode-webui-workspace?referralCode=Z1xivh&utm_medium=integration&utm_source=template&utm_campaign=generic)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/O5nDar?referralCode=Z1xivh&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 A containerized development environment running OpenCode WebUI with comprehensive tooling support. This Docker image includes Python, Node.js, Bun, Go, Rust, and essential development tools, all running under a non-root `opencode` user with sudo privileges.
 
 ## Features
 
-- **OpenCode WebUI** (v1.1.25) - AI-powered code editor
-- **Python 3.13.11** with `python` alias
-- **Node.js 24.13.0** with npm 11.6.2
-- **Bun 1.3.6** - Fast JavaScript runtime
-- **Go 1.23.5** - Systems programming language
-- **Rust 1.92.0** with Cargo - Systems programming language
-- **uv 0.9.26** - Python package manager
+- **OpenCode** (v2, latest stable) - AI coding agent served via the `opencode serve` web UI
+- **Python 3.14** (Ubuntu 26.04 distro) with `python` alias
+- **Node.js 24.x** (LTS) with npm
+- **Bun** (latest) - Fast JavaScript runtime
+- **Go** (latest stable) - Systems programming language
+- **Rust** (latest stable) with Cargo - Systems programming language
+- **uv** (latest) - Python package manager
+- **glab + gh** (latest) - GitLab / GitHub CLIs, **Wrangler** (global npm)
 - **Non-root user** (`opencode`) with passwordless sudo access
 - **Pre-configured workspace** at `/home/opencode/workspace`
 
@@ -83,6 +84,19 @@ docker-compose up -d
 
 The `./workspace` directory will be created on your host machine on first run.
 
+### Railway
+
+Template code: `O5nDar` (publish it to activate the Deploy button above).
+Live reference is service `opencode` + volume mounted at
+`/home/opencode/workspace`. Required variables:
+
+- `OPENCODE_SERVER_PASSWORD` - server login password (secret, never commit)
+- `OPENCODE_SERVER_USERNAME` - server login username (default: `opencode`)
+- `RAILWAY_RUN_UID=0` - required: volumes mount as root, the image runs non-root
+
+Infrastructure is also declared as code in `.railway/railway.ts`
+(`railway config plan` / `railway config apply`).
+
 ## Advanced Usage
 
 ### Build Locally
@@ -110,7 +124,7 @@ docker run -it --rm opencode-webui-workspace:latest bash
 Run Python directly:
 
 ```bash
-docker run -it --rm opencode-webui-workspace:latest python -c "print('Hello from Python 3.13')"
+docker run -it --rm opencode-webui-workspace:latest python -c "print('Hello from Python 3.14')"
 ```
 
 ### Development Workflow
@@ -122,12 +136,15 @@ docker run -it --rm \
   opencode-webui-workspace:latest bash
 
 # Inside container, all your tools are available:
-python --version      # Python 3.13.11
-node --version        # v24.13.0
-bun --version         # 1.3.6
-go version            # go1.23.5
-rustc --version       # 1.92.0
-uv --version          # 0.9.26
+python --version      # Python 3.14
+node --version        # v24.x (LTS)
+bun --version         # latest
+go version            # latest stable
+rustc --version       # latest stable
+uv --version          # latest
+glab --version        # GitLab CLI (latest)
+gh --version          # GitHub CLI (latest)
+wrangler --version    # Cloudflare CLI
 rclone version        # Cloud storage sync
 wormhole              # Secure file transfer
 ```
@@ -150,7 +167,9 @@ The container provides a clean workspace at `/home/opencode/workspace/`. You can
 ├── projects/          # Your project files (you create this)
 ├── data/              # Your data files (you create this)
 ├── logs/              # Your log files (you create this)
-└── opencode.json      # OpenCode configuration (included in image)
+
+(OpenCode config ships at `~/.config/opencode/opencode.json`, outside the
+workspace so volume mounts can't shadow it.)
 ```
 
 ## Publishing Images
